@@ -1,4 +1,5 @@
 import { CppStatement, FunctionDeclaration, Program, ReturnStatement, UnsafeStatement, VariableDeclaration } from "../frontend/ast.ts";
+import { logError } from "../utils/logger.ts";
 import compiler from "./compiler.ts";
 import { Environment } from "./environment.ts";
 
@@ -33,7 +34,7 @@ export function compileVariableDeclaration(varDecl: VariableDeclaration, env: En
             break;
         
         case 'void':
-            console.error(`Cannot use void as a type`);
+            logError(`Cannot use void as a type`);
             break;
 
     }
@@ -96,7 +97,7 @@ export function compileFunctionDeclaration(funcDecl: FunctionDeclaration, env: E
                 break;
 
             case 'void':
-                console.error(`Cannot use void as a type`);
+                logError(`Cannot use void as a type`);
         }
 
         code += `${funcDecl.parameters[i].name}`;

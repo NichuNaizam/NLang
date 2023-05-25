@@ -12,6 +12,7 @@ BinaryExpression,
     UnsafeStatement,
     VariableDeclaration,
 } from '../frontend/ast.ts';
+import { logError } from '../utils/logger.ts';
 import { Environment } from './environment.ts';
 import { compileBinaryExpression, compileCallExpression, compileIdentifier } from './expressions.ts';
 import {
@@ -58,7 +59,7 @@ function compile(astNode: Statement, semicolon = true, env: Environment, forceCh
             return compileIdentifier(astNode as Identifier, env, forceChecks);
 
         default:
-            console.error(`Cannot compile ${astNode.kind}`);
+            logError('Unknown AST node kind: ' + astNode.kind);
     }
 
     return '';

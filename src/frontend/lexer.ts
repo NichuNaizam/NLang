@@ -1,3 +1,5 @@
+import { logError } from "../utils/logger.ts";
+
 export enum TokenType {
     // Literal Types
     NumberToken, // 1234
@@ -177,20 +179,31 @@ export function tokenize(sourceCode: string): Token[] {
                     }
 
                     if (src[0] != '{') {
-                        console.error(`Cpp block must be followed by a {`);
+                        logError('Expected { after cpp keyword');
                         Deno.exit(1);
                     }
 
                     src.shift();
                     column++;
 
+                    let openParen = 1;
+
                     let code = '';
-                    // @ts-ignore Does not terminate the loop when you hit } token
-                    while (src.length > 0 && src[0] != '}') {
+                    while (src.length > 0) {
                         // @ts-ignore Does not increment line and column when you hit \n
                         if (src[0] == '\n') {
                             line++;
                             column = 1;
+                        }
+
+                        if (src[0] == '{') {
+                            openParen++;
+                        }
+
+                        // @ts-ignore Does not terminate the loop when you hit } token
+                        if (src[0] == '}') {
+                            openParen--;
+                            if (openParen == 0) break;
                         }
 
                         code += src.shift();
@@ -198,7 +211,7 @@ export function tokenize(sourceCode: string): Token[] {
                     }
 
                     if (src.length == 0) {
-                        console.error(`Unterminated cpp block`);
+                        logError('Unterminated cpp block');
                         Deno.exit(1);
                     }
 
@@ -219,9 +232,7 @@ export function tokenize(sourceCode: string): Token[] {
 
                 while (src[0] != '"') {
                     if (src.length == 0) {
-                        console.log(
-                            `Unterminated string at position ${src.length} in source code`
-                        );
+                        logError('Unterminated string in source code');
                         Deno.exit(1);
                     }
 
@@ -241,9 +252,7 @@ export function tokenize(sourceCode: string): Token[] {
 
                 while (src[0] != "'") {
                     if (src.length == 0) {
-                        console.log(
-                            `Unterminated string at position ${src.length} in source code`
-                        );
+                        logError('Unterminated string in source code');
                         Deno.exit(1);
                     }
 
@@ -264,9 +273,7 @@ export function tokenize(sourceCode: string): Token[] {
                 src.shift();
                 column++;
             } else {
-                console.log(
-                    `Unrecognized token: ${src[0]} at position ${src.length} in source code`
-                );
+                logError(`Unexpected token ${src[0]} at line ${line} column ${column}`);
                 Deno.exit(1);
             }
         }

@@ -1,4 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
+import { logError } from '../utils/logger.ts';
 import {
     AssignmentExpression,
     BinaryExpression,
@@ -42,7 +43,7 @@ export default class Parser {
     private expect(type: TokenType, err: any) {
         const prev = this.tokens.shift() as Token;
         if (!prev || prev.type != type) {
-            console.error('Parser Error: ', err, prev, ' - Expecting: ', type);
+            logError(`Parser Error: ${err}! Got: ${prev.value} - line: ${prev.line}, column: ${prev.column}`)
             Deno.exit(1);
         }
 
@@ -74,14 +75,7 @@ export default class Parser {
                 break;
 
             default:
-                console.error(
-                    'Parser Error: Expected data type! Got: ' +
-                        this.at().type +
-                        ' - line: ' +
-                        this.at().line +
-                        ', column: ' +
-                        this.at().column
-                );
+                logError(`Parser Error: Expected data type! Got: ${this.at().value} - line: ${this.at().line}, column: ${this.at().column}`);
                 Deno.exit(1);
                 break;
         }
@@ -428,7 +422,7 @@ export default class Parser {
                 property = this.parsePrimaryExpression();
 
                 if (property.kind != 'Identifier') {
-                    console.error('Expected identifier, got', property);
+                    logError('Expected identifier, got' + property);
                     Deno.exit(1);
                 }
             } else {
@@ -480,10 +474,7 @@ export default class Parser {
             }
 
             default:
-                console.error(
-                    'Unexpected token found during parsing!',
-                    this.at()
-                );
+                logError('Unexpected token ' + this.at().value);
                 Deno.exit(1);
         }
     }

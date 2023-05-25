@@ -1,6 +1,8 @@
 import compiler from './compiler/compiler.ts';
 import { Environment } from './compiler/environment.ts';
 import Parser from './frontend/parser.ts';
+import downloadFile from './utils/downloadFile.ts';
+import { logInfo, logWarn } from './utils/logger.ts';
 
 // Parse command line arguments
 const args = Deno.args;
@@ -22,6 +24,7 @@ if (output == '') {
     Deno.exit(1);
 }
 
+// Read the source file
 const source = Deno.readTextFileSync(sourceFile);
 
 const parser = new Parser();
@@ -29,14 +32,30 @@ const ast = parser.produceAST(source);
 
 const env = new Environment();
 
+logInfo('Compiling...');
 const code = compiler.compile(ast, true, env);
 
-Deno.writeFileSync('./out/script.cpp', new TextEncoder().encode(code));
+try {
+    Deno.mkdirSync('./.nlang');
+} catch (e) {
+}
+
+Deno.writeFileSync('./.nlang/script.cpp', new TextEncoder().encode(code));
+
+// Check if nlang.h exists file
+try {
+    await Deno.stat('./.nlang/nlang.h');
+} catch (e) {
+    // Download nlang.h
+    await downloadFile('https://raw.githubusercontent.com/NichuNaizam/NLang/master/nlang.h', './.nlang/nlang.h');
+}
+
+// Compile the code
 const command = new Deno.Command('g++', {
-    args: ['out/script.cpp', '-o', output, '--std=c++11'],
+    args: ['.nlang/script.cpp', '-o', output, '--std=c++11'],
 });
 const process = command.spawn();
 await process.output();
 
-console.log(`Compiled ${sourceFile} to ${output}`);
+logInfo('Compiled successfully');
 Deno.exit(0);

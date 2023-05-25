@@ -1,4 +1,5 @@
 import { BinaryExpression, CallExpression, Identifier } from "../frontend/ast.ts";
+import { logError } from "../utils/logger.ts";
 import compiler from "./compiler.ts";
 import { Environment } from "./environment.ts";
 
@@ -8,7 +9,7 @@ export function compileCallExpression(callExpr: CallExpression, env: Environment
     code += compiler.compile(callExpr.caller, false, env, !callExpr.macro);
 
     if (!env.doesExistWithType(code, 'Function') && !callExpr.macro) {
-        console.error(`function ${code} is not defined!`);
+        logError(`function ${code} is not defined!`);
         Deno.exit(1);
     }
 
@@ -38,7 +39,7 @@ export function compileBinaryExpression(exp: BinaryExpression, env: Environment)
 
 export function compileIdentifier(ident: Identifier, env: Environment, forceChecks: boolean) {
     if (!env.doesExist(ident.symbol) && forceChecks) {
-        console.error(`${ident.symbol} is not defined!`);
+        logError(`${ident.symbol} is not defined!`);
         Deno.exit(1);
     }
 
