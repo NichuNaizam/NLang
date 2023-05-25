@@ -1,0 +1,13 @@
+def main(): int {
+    unsafe {
+        let x: int = 100;
+
+        cpp {
+            int* p_x = &x; 
+        }
+
+        print!(p_x);
+    }
+
+    return 0;
+}
