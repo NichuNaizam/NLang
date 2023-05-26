@@ -1,7 +1,8 @@
 {
-    "nlangDir": "./.nlang",
-    "compiler": "g++",
-    "args": [
+    "outDir": "out",
+    "outFile": "nlang.cpp",
+    "compileCommand": "g++",
+    "compileArgs": [
         "-std=c++17"
     ]
 }

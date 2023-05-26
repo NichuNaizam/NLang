@@ -26,6 +26,4 @@ String input() {
     return input;
 }
 
-String
-
 #endif

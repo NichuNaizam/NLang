@@ -26,9 +26,10 @@ if (output == '') {
 }
 
 let config = {
-    nlangDir: './.nlang',
-    compiler: 'g++',
-    args: ['-std=c++17'],
+    outDir: 'out',
+    outFile: 'nlang.cpp',
+    compileCommand: 'g++',
+    compileArgs: ['-std=c++17'],
 } as Config;
 
 // Check config file
@@ -39,6 +40,7 @@ try {
     const loadedConfig = JSON.parse(data);
 
     config = {
+        ...config,
         ...loadedConfig,
     };
 } catch(e) {
@@ -59,27 +61,27 @@ logInfo('Compiling...');
 const code = compiler.compile(ast, true, env);
 
 try {
-    Deno.mkdirSync(config.nlangDir);
+    Deno.mkdirSync(config.outDir);
 } catch (e) {
     // Ignore
 }
 
-Deno.writeFileSync(`${config.nlangDir}/nlang.cpp`, new TextEncoder().encode(code));
+Deno.writeFileSync(`${config.outDir}/${config.outFile}`, new TextEncoder().encode(code));
 
 // Check if nlang.h exists file
 try {
-    await Deno.stat(`${config.nlangDir}/nlang.h`);
+    await Deno.stat(`${config.outDir}/nlang.h`);
 } catch (e) {
     // Download nlang.h
     logWarn('nlang.h not found, downloading...');
     const time = Date.now();
-    await downloadFile('https://raw.githubusercontent.com/NichuNaizam/NLang/master/nlang.h', `${config.nlangDir}/nlang.h`);
+    await downloadFile('https://raw.githubusercontent.com/NichuNaizam/NLang/master/nlang.h', `${config.outDir}/nlang.h`);
     logInfo(`Downloaded nlang.h in ${Date.now() - time}ms!`);
 }
 
 // Compile the code
-const command = new Deno.Command(config.compiler, {
-    args: [`${config.nlangDir}/nlang.cpp`, '-o', output, ...config.args],
+const command = new Deno.Command(config.compileCommand, {
+    args: [`${config.outDir}/${config.outFile}`, '-o', output, ...config.compileArgs],
 });
 const process = command.spawn();
 await process.output();

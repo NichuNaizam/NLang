@@ -1,5 +1,6 @@
 export interface Config {
-    nlangDir: string;
-    compiler: string;
-    args: string[];
+    outDir: string;
+    outFile: string;
+    compileCommand: string;
+    compileArgs: string[];
 }
