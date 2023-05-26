@@ -1,7 +1,15 @@
-import { CppStatement, FunctionDeclaration, Program, ReturnStatement, UnsafeStatement, VariableDeclaration } from "../frontend/ast.ts";
-import { logError } from "../utils/logger.ts";
-import compiler from "./compiler.ts";
-import { Environment } from "./environment.ts";
+import {
+    CppStatement,
+    FunctionDeclaration,
+    Program,
+    ReturnStatement,
+    StructDeclaration,
+    UnsafeStatement,
+    VariableDeclaration,
+} from '../frontend/ast.ts';
+import { validateType } from '../utils/utils.ts';
+import compiler from './compiler.ts';
+import { Environment } from './environment.ts';
 
 export function compileProgram(program: Program, env: Environment) {
     let code = `#include "nlang.h"\n`;
@@ -13,95 +21,40 @@ export function compileProgram(program: Program, env: Environment) {
     return code;
 }
 
-export function compileVariableDeclaration(varDecl: VariableDeclaration, env: Environment) {
-    let code = '';
-
-    switch (varDecl.type) {
-        case 'int':
-            code += 'Int ';
-            break;
-
-        case 'string':
-            code += 'String ';
-            break;
-
-        case 'bool':
-            code += 'Bool ';
-            break;
-
-        case 'float':
-            code += 'Float ';
-            break;
-        
-        case 'void':
-            logError(`Cannot use void as a type`);
-            break;
-
-    }
+export function compileVariableDeclaration(
+    varDecl: VariableDeclaration,
+    env: Environment
+) {
+    let code = (validateType(varDecl.type, env) as string) + ' ';
 
     if (varDecl.value) {
-        code += `${varDecl.identifier} = ${compiler.compile(varDecl.value, false, env)}`;
+        code += `${varDecl.identifier} = ${compiler.compile(
+            varDecl.value,
+            false,
+            env
+        )}`;
     } else {
         code += `${varDecl.identifier}`;
     }
 
-    env.setValue(varDecl.identifier, 'DataType');
+    env.defineIdentifier(varDecl.identifier, 'Struct');
     return code;
 }
 
-export function compileFunctionDeclaration(funcDecl: FunctionDeclaration, env: Environment) {
-    let code = '';
+export function compileFunctionDeclaration(
+    funcDecl: FunctionDeclaration,
+    env: Environment
+) {
+    let code = (validateType(funcDecl.returnType, env) as string) + ' ';
     const newEnv = new Environment(env);
-
-    switch (funcDecl.returnType) {
-        case 'int':
-            code += 'Int ';
-            break;
-
-        case 'string':
-            code += 'String ';
-            break;
-
-        case 'bool':
-            code += 'Bool ';
-            break;
-
-        case 'float':
-            code += 'Float ';
-            break;
-        
-        case 'void':
-            code += 'Void ';
-            break;
-
-    }
 
     code += `${funcDecl.name}(`;
 
     for (let i = 0; i < funcDecl.parameters.length; i++) {
-        switch (funcDecl.parameters[i].type) {
-            case 'int':
-                code += 'Int ';
-                break;
-
-            case 'string':
-                code += 'String ';
-                break;
-
-            case 'bool':
-                code += 'Bool ';
-                break;
-
-            case 'float':
-                code += 'Float ';
-                break;
-
-            case 'void':
-                logError(`Cannot use void as a type`);
-        }
-
+        code +=
+            (validateType(funcDecl.parameters[i].type, env) as string) + ' ';
         code += `${funcDecl.parameters[i].name}`;
-        newEnv.setValue(funcDecl.parameters[i].name, 'DataType');
+        newEnv.defineIdentifier(funcDecl.parameters[i].name, 'Struct');
 
         if (i < funcDecl.parameters.length - 1) {
             code += ', ';
@@ -116,11 +69,14 @@ export function compileFunctionDeclaration(funcDecl: FunctionDeclaration, env: E
 
     code += '}';
 
-    env.setValue(funcDecl.name, 'Function');
-    return code;    
+    env.defineFunction(funcDecl.name, funcDecl.parameters, funcDecl.returnType);
+    return code;
 }
 
-export function compileReturnStatement(returnStmt: ReturnStatement, env: Environment) {
+export function compileReturnStatement(
+    returnStmt: ReturnStatement,
+    env: Environment
+) {
     let code = 'return ';
 
     if (returnStmt.value) {
@@ -134,7 +90,10 @@ export function compileCppStatement(unsafe: CppStatement) {
     return unsafe.code;
 }
 
-export function compileUnsafeStatement(unsafe: UnsafeStatement, env: Environment) {
+export function compileUnsafeStatement(
+    unsafe: UnsafeStatement,
+    env: Environment
+) {
     let code = '';
     env.unsafe = true;
 
@@ -143,5 +102,25 @@ export function compileUnsafeStatement(unsafe: UnsafeStatement, env: Environment
     }
 
     env.unsafe = false;
+    return code;
+}
+
+export function compileStructDeclaration(
+    structDecl: StructDeclaration,
+    env: Environment
+) {
+    let code = `struct ${structDecl.name} {`;
+    const properties: Map<string, string> = new Map();
+
+    for (let [key, type] of Object.entries(structDecl.properties)) {
+        type = validateType(type, env) as string;
+        properties.set(key, type);
+
+        code += `${type} ${key};`;
+    }
+
+    code += '};';
+
+    env.defineStruct(structDecl.name, properties);
     return code;
 }

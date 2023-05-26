@@ -1,0 +1,7 @@
+{
+    "nlangDir": "./.nlang",
+    "compiler": "g++",
+    "args": [
+        "-std=c++17"
+    ]
+}

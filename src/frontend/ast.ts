@@ -6,25 +6,27 @@ export type NodeType =
     | 'ReturnStatement'
     | 'CppStatement'
     | 'UnsafeStatement'
+    | 'StructDeclaration'
 
     // Expressions
     | 'AssignmentExpression'
     | 'MemberExpression'
     | 'CallExpression'
+    | 'BinaryExpression'
+    | 'MemoryReferenceExpression'
+    | 'MemoryDereferenceExpression'
+    | 'ParenthesisExpression'
 
     // Literal
-    | 'Property'
     | 'ObjectLiteral'
     | 'NumericLiteral'
     | 'StringLiteral'
-    | 'Identifier'
-    | 'BinaryExpression';
+    | 'Identifier';
 
-export type DataTypes = 'int' | 'float' | 'string' | 'bool' | 'void';
 
 export interface Parameter {
     name: string;
-    type: DataTypes;
+    type: string;
 }
 
 // Statements wont return a value
@@ -42,7 +44,7 @@ export interface Program extends Statement {
 export interface VariableDeclaration extends Statement {
     kind: 'VariableDeclaration';
     identifier: string;
-    type: DataTypes;
+    type: string;
     value?: Expression;
 }
 
@@ -51,7 +53,7 @@ export interface FunctionDeclaration extends Statement {
     name: string;
     parameters: Parameter[];
     body: Statement[];
-    returnType: DataTypes;
+    returnType: string;
 }
 
 export interface ReturnStatement extends Statement {
@@ -69,6 +71,12 @@ export interface UnsafeStatement extends Statement {
     body: Statement[];
 }
 
+export interface StructDeclaration extends Statement {
+    kind: 'StructDeclaration';
+    name: string;
+    properties: Record<string, string>;
+}
+
 // Expressions
 
 export interface AssignmentExpression extends Expression {
@@ -84,6 +92,21 @@ export interface BinaryExpression extends Expression {
     right: Expression;
 }
 
+export interface MemoryReferenceExpression extends Expression {
+    kind: 'MemoryReferenceExpression';
+    value: Expression;
+}
+
+export interface MemoryDereferenceExpression extends Expression {
+    kind: 'MemoryDereferenceExpression';
+    value: Expression;
+}
+
+export interface ParenthesisExpression extends Expression {
+    kind: 'ParenthesisExpression';
+    value: Expression;
+}
+
 export interface CallExpression extends Expression {
     kind: 'CallExpression';
     args: Expression[];
@@ -95,7 +118,7 @@ export interface MemberExpression extends Expression {
     kind: 'MemberExpression';
     object: Expression;
     property: Expression;
-    computed: boolean;
+    arrow: boolean;
 }
 
 export interface Identifier extends Expression {
@@ -114,13 +137,7 @@ export interface StringLiteral extends Expression {
     value: string;
 }
 
-export interface Property extends Expression {
-    kind: 'Property';
-    key: string;
-    value?: Expression;
-}
-
 export interface ObjectLiteral extends Expression {
     kind: 'ObjectLiteral';
-    properties: Property[];
+    properties: Expression[];
 }

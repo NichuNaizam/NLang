@@ -12,13 +12,7 @@ export enum TokenType {
     ReturnKeyword, // return
     CppKeyword, // cpp
     UnsafeKeyword, // unsafe
-
-    // Data Types
-    IntKeyword, // int
-    FloatKeyword, // float
-    StringKeyword, // string
-    BooleanKeyword, // bool
-    VoidKeyword, // void
+    StructKeyword, // struct
 
     // Grouping * Operators
     DotToken, // .
@@ -31,6 +25,9 @@ export enum TokenType {
     OpenBraceToken, // {
     CloseBraceToken, // }
     BinaryOperatorToken, // + - * / %
+    GreaterThanToken, // >
+    LessThanToken, // <
+    AmpersandToken, // &
     OpenBracketToken, // [
     CloseBracketToken, // ]
     SemicolonToken, // ;
@@ -50,11 +47,7 @@ const keywords: Record<string, TokenType> = {
     return: TokenType.ReturnKeyword,
     cpp: TokenType.CppKeyword,
     unsafe: TokenType.UnsafeKeyword,
-    int: TokenType.IntKeyword,
-    float: TokenType.FloatKeyword,
-    string: TokenType.StringKeyword,
-    bool: TokenType.BooleanKeyword,
-    void: TokenType.VoidKeyword,
+    struct: TokenType.StructKeyword,
 };
 
 function token(
@@ -149,6 +142,12 @@ export function tokenize(sourceCode: string): Token[] {
             tokens.push(token(TokenType.DotToken, src.shift(), line, column));
         } else if (src[0] == '!') {
             tokens.push(token(TokenType.ExclamationToken, src.shift(), line, column));
+        } else if (src[0] == '&') {
+            tokens.push(token(TokenType.AmpersandToken, src.shift(), line, column));
+        } else if (src[0] == '>') {
+            tokens.push(token(TokenType.GreaterThanToken, src.shift(), line, column));
+        } else if (src[0] == '<') {
+            tokens.push(token(TokenType.LessThanToken, src.shift(), line, column));
         } else {
             // Handle Multicharector tokens
             if (isInt(src[0])) {

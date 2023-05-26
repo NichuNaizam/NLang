@@ -5,19 +5,21 @@ import {
     BinaryExpression,
     CallExpression,
     CppStatement,
-    DataTypes,
     Expression,
     FunctionDeclaration,
     Identifier,
     MemberExpression,
+    MemoryDereferenceExpression,
+    MemoryReferenceExpression,
     NumericLiteral,
     ObjectLiteral,
     Parameter,
+    ParenthesisExpression,
     Program,
-    Property,
     ReturnStatement,
     Statement,
     StringLiteral,
+    StructDeclaration,
     UnsafeStatement,
     VariableDeclaration,
 } from './ast.ts';
@@ -43,45 +45,61 @@ export default class Parser {
     private expect(type: TokenType, err: any) {
         const prev = this.tokens.shift() as Token;
         if (!prev || prev.type != type) {
-            logError(`Parser Error: ${err}! Got: ${prev.value} - line: ${prev.line}, column: ${prev.column}`)
+            logError(
+                `Parser Error: ${err} Got: ${prev.value} - line: ${prev.line}, column: ${prev.column}`
+            );
             Deno.exit(1);
         }
 
         return prev;
     }
 
-    private getDataType() {
-        let type: DataTypes = 'int';
+    private getIdentifier(): string {
+        if (this.at().type == TokenType.IdentifierToken) {
+            let toReturn = this.eat().value;
 
-        switch (this.at().type) {
-            case TokenType.IntKeyword:
-                type = 'int';
-                break;
+            if (
+                this.at().type == TokenType.BinaryOperatorToken &&
+                this.at().value == '*'
+            ) {
+                toReturn += this.eat().value;
+            }
 
-            case TokenType.FloatKeyword:
-                type = 'float';
-                break;
+            return toReturn;
+        } else if (
+            this.at().type == TokenType.BinaryOperatorToken &&
+            this.at().value == '*'
+        ) {
+            let toReturn = this.eat().value;
+            toReturn += this.getIdentifier();
 
-            case TokenType.StringKeyword:
-                type = 'string';
-                break;
+            return toReturn;
+        } else if (this.at().type == TokenType.AmpersandToken) {
+            let toReturn = this.eat().value;
+            toReturn += this.getIdentifier();
 
-            case TokenType.BooleanKeyword:
-                type = 'bool';
-                break;
+            return toReturn;
+        } else {
+            logError(
+                `Parser Error: Expected identifier, got ${
+                    this.at().value
+                } - line: ${this.at().line}, column: ${this.at().column}`
+            );
+            Deno.exit(1);
+        }
+    }
 
-            case TokenType.VoidKeyword:
-                type = 'void';
-                break;
-
-            default:
-                logError(`Parser Error: Expected data type! Got: ${this.at().value} - line: ${this.at().line}, column: ${this.at().column}`);
-                Deno.exit(1);
-                break;
+    private parseArrow() {
+        if (
+            this.tokens[0].value == '-' &&
+            this.tokens[1].type == TokenType.GreaterThanToken
+        ) {
+            this.eat();
+            this.eat();
+            return true;
         }
 
-        this.eat();
-        return type;
+        return false;
     }
 
     public produceAST(sourceCode: string): Program {
@@ -115,6 +133,9 @@ export default class Parser {
             case TokenType.UnsafeKeyword:
                 return this.parseUnsafeStatement();
 
+            case TokenType.StructKeyword:
+                return this.parseStructDeclaration();
+
             default:
                 return this.parseExpression();
         }
@@ -137,7 +158,10 @@ export default class Parser {
                 'Expected parameter name'
             ).value;
             this.expect(TokenType.ColonToken, 'Expected :');
-            const paramType = this.getDataType();
+            const paramType = this.expect(
+                TokenType.IdentifierToken,
+                'Expected parameter type'
+            ).value;
 
             parameters.push({
                 name: paramName,
@@ -152,7 +176,10 @@ export default class Parser {
         this.expect(TokenType.CloseParenToken, 'Expected )'); // Eat the closing paren
 
         this.expect(TokenType.ColonToken, "Expected ':'");
-        const returnType = this.getDataType();
+        const returnType = this.expect(
+            TokenType.IdentifierToken,
+            'Expected return type'
+        ).value;
 
         this.expect(TokenType.OpenBraceToken, 'Expected {');
         const body: Statement[] = [];
@@ -202,7 +229,7 @@ export default class Parser {
         this.eat(); // Eat the 'unsafe' keyword
         const body: Statement[] = [];
 
-        this.expect(TokenType.OpenBraceToken, 'Expected { in unsafe block')
+        this.expect(TokenType.OpenBraceToken, 'Expected { in unsafe block');
 
         while (this.notEOF() && this.at().type != TokenType.CloseBraceToken) {
             body.push(this.parseStatement());
@@ -213,6 +240,46 @@ export default class Parser {
             kind: 'UnsafeStatement',
             body,
         } as UnsafeStatement;
+    }
+
+    private parseStructDeclaration(): Statement {
+        this.eat(); // Eat the 'struct' keyword
+        const name = this.expect(
+            TokenType.IdentifierToken,
+            'Expected identifier'
+        ).value;
+
+        this.expect(TokenType.OpenBraceToken, 'Expected {');
+
+        const properties: Record<string, string> = {};
+
+        while (this.notEOF() && this.at().type != TokenType.CloseBraceToken) {
+            const key = this.expect(
+                TokenType.IdentifierToken,
+                'Expected key!'
+            ).value;
+
+            this.expect(TokenType.ColonToken, 'Expected :');
+
+            const type = this.expect(
+                TokenType.IdentifierToken,
+                'Expected type!'
+            ).value;
+
+            properties[key] = type;
+
+            if (this.at().type == TokenType.CommaToken) {
+                this.eat();
+            }
+        }
+
+        this.expect(TokenType.CloseBraceToken, 'Expected }');
+
+        return {
+            kind: 'StructDeclaration',
+            name,
+            properties,
+        } as StructDeclaration;
     }
 
     private parseExpression(): Expression {
@@ -242,30 +309,13 @@ export default class Parser {
         }
 
         this.eat(); // Advances past {
-        const properties = new Array<Property>();
+        const properties = new Array<Expression>();
 
         while (this.notEOF() && this.at().type != TokenType.CloseBraceToken) {
-            const key = this.expect(
-                TokenType.IdentifierToken,
-                'Expected key!'
-            ).value;
+            properties.push(this.parseExpression());
 
-            // Allows shorthand key comma pair { fooBar }
-            if (this.at().type == TokenType.CommaToken) {
-                this.eat(); // Advance past ,
-                properties.push({ kind: 'Property', key });
-                continue;
-            } else if (this.at().type == TokenType.CloseBraceToken) {
-                properties.push({ kind: 'Property', key });
-                continue;
-            }
-
-            this.expect(TokenType.ColonToken, 'Expected :');
-            const value = this.parseExpression();
-
-            properties.push({ kind: 'Property', key, value });
             if (this.at().type != TokenType.CloseBraceToken) {
-                this.expect(TokenType.CommaToken, 'Expected ,');
+                this.expect(TokenType.CommaToken, 'Expected , or }');
             }
         }
 
@@ -281,7 +331,7 @@ export default class Parser {
         ).value;
 
         this.expect(TokenType.ColonToken, "Expected ':'");
-        const type = this.getDataType();
+        const type = this.getIdentifier();
 
         if (this.at().type != TokenType.EqualsToken) {
             return {
@@ -343,7 +393,10 @@ export default class Parser {
     private parseCallMemberExpression(): Expression {
         const member = this.parseMemberExpression();
 
-        if (this.at().type == TokenType.OpenParenToken || this.at().type == TokenType.ExclamationToken) {
+        if (
+            this.at().type == TokenType.OpenParenToken ||
+            this.at().type == TokenType.ExclamationToken
+        ) {
             return this.parseCallExpression(member);
         } else {
             return member;
@@ -366,7 +419,6 @@ export default class Parser {
 
             return callExpr;
         }
-
 
         let callExpr: Expression = {
             kind: 'CallExpression',
@@ -406,37 +458,28 @@ export default class Parser {
     private parseMemberExpression(): Expression {
         let object = this.parsePrimaryExpression();
 
-        while (
-            this.at().type == TokenType.DotToken ||
-            this.at().type == TokenType.OpenBracketToken
-        ) {
-            const operator = this.eat();
+        while (this.at().type == TokenType.DotToken || this.parseArrow()) {
             let property: Expression;
-            let computed: boolean;
+            let arrow = true;
 
-            // non-computed values aka obj.expr
-            if (operator.type == TokenType.DotToken) {
-                computed = false;
+            if (this.at().type == TokenType.DotToken) {
+                arrow = false;
+                this.eat(); // Eat the .
+            }
 
-                // Get identifier
-                property = this.parsePrimaryExpression();
+            // Get identifier
+            property = this.parsePrimaryExpression();
 
-                if (property.kind != 'Identifier') {
-                    logError('Expected identifier, got' + property);
-                    Deno.exit(1);
-                }
-            } else {
-                // This allows obj[expr]
-                computed = true;
-                property = this.parseExpression();
-                this.expect(TokenType.CloseBracketToken, 'Expected ]');
+            if (property.kind != 'Identifier') {
+                logError('Expected identifier, got' + property);
+                Deno.exit(1);
             }
 
             object = {
                 kind: 'MemberExpression',
                 object,
                 property,
-                computed,
+                arrow,
             } as MemberExpression;
         }
 
@@ -470,7 +513,35 @@ export default class Parser {
                 this.eat();
                 const value = this.parseExpression();
                 this.expect(TokenType.CloseParenToken, 'Expected )');
-                return value;
+                
+                return {
+                    kind: 'ParenthesisExpression',
+                    value,
+                } as ParenthesisExpression;
+            }
+
+            case TokenType.AmpersandToken: {
+                this.eat(); // Eat the &
+                const value = this.parseExpression();
+                return {
+                    kind: 'MemoryReferenceExpression',
+                    value,
+                } as MemoryReferenceExpression;
+            }
+
+            case TokenType.BinaryOperatorToken: {
+                if (this.at().value == '*') {
+                    this.eat(); // Eat the *
+                    const value = this.parseExpression();
+                    return {
+                        kind: 'MemoryDereferenceExpression',
+                        value,
+                    } as MemoryDereferenceExpression;
+                }
+
+                logError('Unexpected token ' + this.at().value);
+                Deno.exit(1);
+                break;
             }
 
             default:

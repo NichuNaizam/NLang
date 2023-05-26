@@ -16,5 +16,5 @@ export default async function downloadFile(src: string, dest: string) {
 
     await ensureFile(dest);
     const file = await Deno.open(dest, { truncate: true, write: true });
-    resp.body.pipeTo(file.writable);
+    resp.body?.pipeTo(file.writable);
 }

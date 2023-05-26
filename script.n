@@ -1,3 +1,17 @@
-def main(): int {
+struct foo {
+    bar: Int;
+    text: String;
+}
+
+struct bar {
+    bar: foo;
+    text: String;
+}
+
+def main(): Int {
+    let f: foo = { 12, "Hello " };
+    let b: foo* = &f;
+
+    print!((*b).text);
     return 0;
 }
