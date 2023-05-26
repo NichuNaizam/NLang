@@ -13,6 +13,7 @@ export enum TokenType {
     CppKeyword, // cpp
     UnsafeKeyword, // unsafe
     StructKeyword, // struct
+    ImportKeyword, // import
 
     // Grouping * Operators
     DotToken, // .
@@ -45,6 +46,7 @@ const keywords: Record<string, TokenType> = {
     let: TokenType.LetKeyword,
     def: TokenType.DefineKeyword,
     return: TokenType.ReturnKeyword,
+    import: TokenType.ImportKeyword,
     cpp: TokenType.CppKeyword,
     unsafe: TokenType.UnsafeKeyword,
     struct: TokenType.StructKeyword,

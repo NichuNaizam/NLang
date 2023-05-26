@@ -7,6 +7,7 @@ export type NodeType =
     | 'CppStatement'
     | 'UnsafeStatement'
     | 'StructDeclaration'
+    | 'ImportStatement'
 
     // Expressions
     | 'AssignmentExpression'
@@ -75,6 +76,11 @@ export interface StructDeclaration extends Statement {
     kind: 'StructDeclaration';
     name: string;
     properties: Record<string, string>;
+}
+
+export interface ImportStatement extends Statement {
+    kind: 'ImportStatement';
+    path: string;
 }
 
 // Expressions

@@ -35,6 +35,11 @@ export class Environment {
     }
 
     public defineStruct(name: string, struct: Map<string, string>) {
+        if (this.doesExistWithType(name, 'Struct')) {
+            logError(`Struct ${name} was already defined!`);
+            Deno.exit(1);
+        }
+
         this.structs.set(name, struct);
         this.defineIdentifier(name, 'Struct');
     }
@@ -53,6 +58,11 @@ export class Environment {
         parameters: Parameter[],
         returnType: string
     ) {
+        if (this.doesExistWithType(name, 'Function')) {
+            logError(`Function ${name} was already defined!`);
+            Deno.exit(1);
+        }
+
         this.functions.set(name, { parameters, returnType });
         this.defineIdentifier(name, 'Function');
     }
@@ -69,6 +79,11 @@ export class Environment {
     }
 
     public defineVariable(name: string, type: string, value: string) {
+        if (this.doesExistWithType(name, 'Variable')) {
+            logError(`Variable ${name} was already defined!`);
+            Deno.exit(1);
+        }
+
         this.variables.set(name, { type, value });
         this.defineIdentifier(name, 'Variable');
     }

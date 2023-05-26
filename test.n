@@ -1,0 +1,9 @@
+class fooBar {
+    public x: Int = 0;
+    public y: Int = 0;
+
+    constructor(x: Int, y: Int) {
+        this->x = x;
+        this->y = y;
+    }
+};

@@ -1,12 +1,16 @@
 import {
     CppStatement,
     FunctionDeclaration,
+    ImportStatement,
     Program,
     ReturnStatement,
     StructDeclaration,
     UnsafeStatement,
     VariableDeclaration,
 } from '../frontend/ast.ts';
+import { tokenize } from '../frontend/lexer.ts';
+import Parser from '../frontend/parser.ts';
+import { logError } from '../utils/logger.ts';
 import { validateType } from '../utils/utils.ts';
 import compiler from './compiler.ts';
 import { Environment } from './environment.ts';
@@ -122,5 +126,23 @@ export function compileStructDeclaration(
     code += '};';
 
     env.defineStruct(structDecl.name, properties);
+    return code;
+}
+
+export function compileImportStatement(importStmt: ImportStatement, env: Environment) {
+    let code = '';
+
+    try {
+        const importCode = Deno.readTextFileSync(importStmt.path);
+
+        const parser = new Parser();
+        const program = parser.produceAST(importCode);
+
+        code = compiler.compile(program, true, env, true);
+    } catch(e) {
+        logError(`Failed to import file ${importStmt.path}`);
+        Deno.exit(1);
+    }
+
     return code;
 }

@@ -5,6 +5,7 @@ BinaryExpression,
     CppStatement,
     FunctionDeclaration,
     Identifier,
+    ImportStatement,
     MemberExpression,
     MemoryDereferenceExpression,
     MemoryReferenceExpression,
@@ -24,6 +25,7 @@ import { Environment } from './environment.ts';
 import { compileAssignmentExpression, compileBinaryExpression, compileCallExpression, compileIdentifier, compileMemberExpression, compileObjectLiteral } from './expressions.ts';
 import {
     compileFunctionDeclaration,
+    compileImportStatement,
     compileProgram,
     compileReturnStatement,
     compileStructDeclaration,
@@ -53,6 +55,9 @@ function compile(astNode: Statement, semicolon = true, env: Environment, forceCh
 
         case 'StructDeclaration':
             return compileStructDeclaration(astNode as StructDeclaration, env);
+
+        case 'ImportStatement':
+            return compileImportStatement(astNode as ImportStatement, env);
 
         case 'ObjectLiteral':
             return compileObjectLiteral(astNode as ObjectLiteral, env);

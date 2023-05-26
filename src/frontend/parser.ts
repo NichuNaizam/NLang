@@ -8,6 +8,7 @@ import {
     Expression,
     FunctionDeclaration,
     Identifier,
+    ImportStatement,
     MemberExpression,
     MemoryDereferenceExpression,
     MemoryReferenceExpression,
@@ -135,6 +136,9 @@ export default class Parser {
 
             case TokenType.StructKeyword:
                 return this.parseStructDeclaration();
+
+            case TokenType.ImportKeyword:
+                return this.parseImportStatement();
 
             default:
                 return this.parseExpression();
@@ -280,6 +284,19 @@ export default class Parser {
             name,
             properties,
         } as StructDeclaration;
+    }
+
+    private parseImportStatement(): Statement {
+        this.eat(); // Eat the 'import' keyword
+        let path = this.expect(
+            TokenType.StringToken,
+            'Expected string after import keyword!'
+        ).value.replaceAll('"', '');
+
+        return {
+            kind: 'ImportStatement',
+            path: path,
+        } as ImportStatement;
     }
 
     private parseExpression(): Expression {

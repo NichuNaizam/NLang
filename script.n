@@ -1,17 +1,8 @@
-struct foo {
-    bar: Int;
-    text: String;
-}
-
-struct bar {
-    bar: foo;
-    text: String;
-}
+import "./test.n";
 
 def main(): Int {
-    let f: foo = { 12, "Hello " };
-    let b: foo* = &f;
+    let x: fooBar = { 10, 10 };
+    print!(x.foo + x.bar);
 
-    print!((*b).text);
     return 0;
 }
