@@ -2,6 +2,7 @@ import {
 AssignmentExpression,
 BinaryExpression,
     CallExpression,
+    ClassDeclaration,
     CppStatement,
     FunctionDeclaration,
     Identifier,
@@ -9,6 +10,7 @@ BinaryExpression,
     MemberExpression,
     MemoryDereferenceExpression,
     MemoryReferenceExpression,
+    NewStatement,
     NumericLiteral,
     ObjectLiteral,
     ParenthesisExpression,
@@ -24,8 +26,10 @@ import { logError } from '../utils/logger.ts';
 import { Environment } from './environment.ts';
 import { compileAssignmentExpression, compileBinaryExpression, compileCallExpression, compileIdentifier, compileMemberExpression, compileObjectLiteral } from './expressions.ts';
 import {
+compileClassDeclaration,
     compileFunctionDeclaration,
     compileImportStatement,
+    compileNewStatement,
     compileProgram,
     compileReturnStatement,
     compileStructDeclaration,
@@ -58,6 +62,12 @@ function compile(astNode: Statement, semicolon = true, env: Environment, forceCh
 
         case 'ImportStatement':
             return compileImportStatement(astNode as ImportStatement, env);
+
+        case 'ClassDeclaration':
+            return compileClassDeclaration(astNode as ClassDeclaration, env);
+
+        case 'NewStatement':
+            return compileNewStatement(astNode as NewStatement, env);
 
         case 'ObjectLiteral':
             return compileObjectLiteral(astNode as ObjectLiteral, env);

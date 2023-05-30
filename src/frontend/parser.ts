@@ -1,9 +1,11 @@
 // deno-lint-ignore-file no-explicit-any
 import { logError } from '../utils/logger.ts';
+import { FunctionData, VariableData } from '../utils/types.ts';
 import {
     AssignmentExpression,
     BinaryExpression,
     CallExpression,
+    ClassDeclaration,
     CppStatement,
     Expression,
     FunctionDeclaration,
@@ -12,6 +14,7 @@ import {
     MemberExpression,
     MemoryDereferenceExpression,
     MemoryReferenceExpression,
+    NewStatement,
     NumericLiteral,
     ObjectLiteral,
     Parameter,
@@ -140,6 +143,12 @@ export default class Parser {
             case TokenType.ImportKeyword:
                 return this.parseImportStatement();
 
+            case TokenType.ClassKeyword:
+                return this.parseClassDeclaration();
+
+            case TokenType.NewKeyword:
+                return this.parseNewStatement();
+
             default:
                 return this.parseExpression();
         }
@@ -185,14 +194,20 @@ export default class Parser {
             'Expected return type'
         ).value;
 
-        this.expect(TokenType.OpenBraceToken, 'Expected {');
         const body: Statement[] = [];
+        if (this.at().type == TokenType.OpenBraceToken) {
+            this.eat();
 
-        while (this.notEOF() && this.at().type != TokenType.CloseBraceToken) {
-            body.push(this.parseStatement());
+            while (
+                this.notEOF() &&
+                this.at().type != TokenType.CloseBraceToken
+            ) {
+                body.push(this.parseStatement());
+            }
+    
+            this.expect(TokenType.CloseBraceToken, 'Expected }');
         }
 
-        this.expect(TokenType.CloseBraceToken, 'Expected }');
         return {
             kind: 'FunctionDeclaration',
             name,
@@ -299,6 +314,148 @@ export default class Parser {
         } as ImportStatement;
     }
 
+    private parseClassDeclaration(): Statement {
+        this.eat(); // eat the "class" token
+        const name = this.expect(
+            TokenType.IdentifierToken,
+            'Expected identifier following class keyword'
+        ).value;
+        const constructors: Map<string, FunctionData> = new Map();
+        const variables: Map<string, VariableData> = new Map();
+        const functions: Map<string, FunctionData> = new Map();
+
+        this.expect(
+            TokenType.OpenBraceToken,
+            'Expected { in class declaration!'
+        );
+
+        while (this.notEOF() && this.at().type != TokenType.CloseBraceToken) {
+            switch (this.at().type) {
+                case TokenType.PublicKeyword: {
+                    this.eat(); // Eat the "public" keyword
+
+                    if (this.at().type == TokenType.LetKeyword) {
+                        const variable =
+                            this.parseVariableDeclaration() as VariableDeclaration;
+
+                        variables.set(variable.identifier, {
+                            name: variable.identifier,
+                            value: variable.value,
+                            type: variable.type,
+                            visibility: 'public',
+                        });
+                        break;
+                    } else if (this.at().type == TokenType.DefineKeyword) {
+                        const func =
+                            this.parseFunctionDeclaration() as FunctionDeclaration;
+
+                        if (func.name == name) {
+                            constructors.set(func.name, {
+                                parameters: func.parameters,
+                                returnType: func.returnType,
+                                body: func.body,
+                                visibility: 'public',
+                            });
+
+                            break;
+                        }
+
+                        functions.set(func.name, {
+                            parameters: func.parameters,
+                            returnType: func.returnType,
+                            body: func.body,
+                            visibility: 'public',
+                        });
+                        break;
+                    } else {
+                        logError(
+                            `Expected let or def keyword after public keyword!`
+                        );
+                        Deno.exit(1);
+                    }
+
+                    break;
+                }
+
+                case TokenType.PrivateKeyword: {
+                    this.eat(); // Eat the "private" keyword
+
+                    if (this.at().type == TokenType.LetKeyword) {
+                        const variable =
+                            this.parseVariableDeclaration() as VariableDeclaration;
+
+                        variables.set(variable.identifier, {
+                            name: variable.identifier,
+                            value: variable.value,
+                            type: variable.type,
+                            visibility: 'private',
+                        });
+                        break;
+                    } else if (this.at().type == TokenType.DefineKeyword) {
+                        const func =
+                            this.parseFunctionDeclaration() as FunctionDeclaration;
+
+                        if (func.name == name) {
+                            constructors.set(name, {
+                                parameters: func.parameters,
+                                returnType: func.returnType,
+                                body: func.body,
+                                visibility: 'private',
+                            });
+
+                            break;
+                        }
+
+                        functions.set(func.name, {
+                            parameters: func.parameters,
+                            returnType: func.returnType,
+                            body: func.body,
+                            visibility: 'private',
+                        });
+
+                        break;
+                    } else {
+                        logError(
+                            `Expected let for def keyword after private keyword!`
+                        );
+                        Deno.exit(1);
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        this.expect(
+            TokenType.CloseBraceToken,
+            'Expected } in class declaration!'
+        );
+
+        return {
+            kind: 'ClassDeclaration',
+            name,
+            variables,
+            functions,
+            constructors,
+        } as ClassDeclaration;
+    }
+
+    private parseNewStatement() {
+        this.eat(); // Eat the "new" keyword
+        const callExpr = this.parseExpression() as CallExpression;
+        if (callExpr.kind != 'CallExpression') {
+            logError('Expected class constructor after new keyword!');
+            Deno.exit(1);
+        }
+
+        return {
+            kind: 'NewStatement',
+            name: (callExpr.caller as Identifier).symbol,
+            args: callExpr.args,
+            macro: callExpr.macro,
+        } as NewStatement;
+    }
+
     private parseExpression(): Expression {
         return this.parseAssignmentExpression();
     }
@@ -347,8 +504,14 @@ export default class Parser {
             'Expected identifier'
         ).value;
 
+        let macroType = false;
+
         this.expect(TokenType.ColonToken, "Expected ':'");
         const type = this.getIdentifier();
+        if (this.at().type == TokenType.ExclamationToken) {
+            macroType = true;
+            this.eat(); // Eat the !
+        }
 
         if (this.at().type != TokenType.EqualsToken) {
             return {
@@ -362,7 +525,8 @@ export default class Parser {
         const declaration = {
             kind: 'VariableDeclaration',
             identifier,
-            value: this.parseExpression(),
+            value: this.parseStatement(),
+            macro: macroType,
             type,
         } as VariableDeclaration;
 
@@ -530,7 +694,7 @@ export default class Parser {
                 this.eat();
                 const value = this.parseExpression();
                 this.expect(TokenType.CloseParenToken, 'Expected )');
-                
+
                 return {
                     kind: 'ParenthesisExpression',
                     value,

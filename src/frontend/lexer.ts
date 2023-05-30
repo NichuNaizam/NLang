@@ -14,6 +14,10 @@ export enum TokenType {
     UnsafeKeyword, // unsafe
     StructKeyword, // struct
     ImportKeyword, // import
+    ClassKeyword, // class
+    PublicKeyword, // public
+    PrivateKeyword, // private
+    NewKeyword, // new
 
     // Grouping * Operators
     DotToken, // .
@@ -50,6 +54,10 @@ const keywords: Record<string, TokenType> = {
     cpp: TokenType.CppKeyword,
     unsafe: TokenType.UnsafeKeyword,
     struct: TokenType.StructKeyword,
+    class: TokenType.ClassKeyword,
+    public: TokenType.PublicKeyword,
+    private: TokenType.PrivateKeyword,
+    new: TokenType.NewKeyword,
 };
 
 function token(
@@ -160,7 +168,7 @@ export function tokenize(sourceCode: string): Token[] {
                 }
 
                 tokens.push(token(TokenType.NumberToken, num, line, column));
-            } else if (isAlpha(src[0])) {
+            } else if (isAlpha(src[0]) || src[0] == '_') {
                 let ident = '';
 
                 while (src.length > 0 && isAlpha(src[0]) || isInt(src[0]) || src[0] == '_') { 
@@ -273,6 +281,12 @@ export function tokenize(sourceCode: string): Token[] {
             } else if (isSkippable(src[0])) {
                 src.shift();
                 column++;
+            } else if (src[0] == '#') {
+                // @ts-ignore Unable to loop until \n
+                while (src[0] != '\n') {
+                    src.shift();
+                    column++;
+                }
             } else {
                 logError(`Unexpected token ${src[0]} at line ${line} column ${column}`);
                 Deno.exit(1);

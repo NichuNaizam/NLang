@@ -1,8 +1,0 @@
-{
-    "outDir": "out",
-    "outFile": "nlang.cpp",
-    "compileCommand": "g++",
-    "compileArgs": [
-        "-std=c++17"
-    ]
-}

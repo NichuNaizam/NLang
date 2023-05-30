@@ -1,16 +1,37 @@
-import { AssignmentExpression, BinaryExpression, CallExpression, Identifier, MemberExpression, ObjectLiteral } from "../frontend/ast.ts";
-import { logError } from "../utils/logger.ts";
-import compiler from "./compiler.ts";
-import { Environment } from "./environment.ts";
+import {
+    AssignmentExpression,
+    BinaryExpression,
+    CallExpression,
+    Identifier,
+    MemberExpression,
+    ObjectLiteral,
+} from '../frontend/ast.ts';
+import { logError } from '../utils/logger.ts';
+import { VariableData } from '../utils/types.ts';
+import { parseMemberExpression } from '../utils/utils.ts';
+import compiler from './compiler.ts';
+import { Environment } from './environment.ts';
 
-export function compileCallExpression(callExpr: CallExpression, env: Environment) {
+export function compileCallExpression(
+    callExpr: CallExpression,
+    env: Environment
+) {
     let code = '';
+    const caller = compiler.compile(callExpr.caller, false, env, !callExpr.macro);
 
-    code += compiler.compile(callExpr.caller, false, env, !callExpr.macro);
-
-    if (!env.doesExistWithType(code, 'Function') && !callExpr.macro) {
-        logError(`function ${code} is not defined!`);
-        Deno.exit(1);
+    if (caller.includes('.') || caller.includes('->')) {
+        parseMemberExpression(caller, env);
+        code += caller;
+    } else {
+        // Check if its a function or a class constructor
+        if (env.doesExistWithType(caller, 'Function') || callExpr.macro) {
+            code += caller;
+        } else if (env.doesExistWithType(caller, 'Class')) {
+            code += `${caller}::new`;
+        } else {
+            logError(`Function ${caller} is not defined!`);
+            Deno.exit(1);
+        }
     }
 
     code += '(';
@@ -25,7 +46,10 @@ export function compileCallExpression(callExpr: CallExpression, env: Environment
     return code;
 }
 
-export function compileBinaryExpression(exp: BinaryExpression, env: Environment) {
+export function compileBinaryExpression(
+    exp: BinaryExpression,
+    env: Environment
+) {
     let code = '';
 
     code += compiler.compile(exp.left, false, env);
@@ -35,9 +59,13 @@ export function compileBinaryExpression(exp: BinaryExpression, env: Environment)
     return code;
 }
 
-export function compileIdentifier(ident: Identifier, env: Environment, forceChecks: boolean) {
+export function compileIdentifier(
+    ident: Identifier,
+    env: Environment,
+    forceChecks: boolean
+) {
     if (!env.doesExist(ident.symbol) && forceChecks) {
-        logError(`${ident.symbol} is not defined!`);
+        logError(`Identifier ${ident.symbol} is not defined!`);
         Deno.exit(1);
     }
 
@@ -61,22 +89,30 @@ export function compileObjectLiteral(obj: ObjectLiteral, env: Environment) {
     return code;
 }
 
-export function compileMemberExpression(exp: MemberExpression, env: Environment) {
+export function compileMemberExpression(
+    exp: MemberExpression,
+    env: Environment
+) {
     let code = '';
 
     code += compiler.compile(exp.object, false, env, false);
     code += exp.arrow ? '->' : '.';
     code += compiler.compile(exp.property, false, env, false);
 
+    parseMemberExpression(code, env);
+
     return code;
 }
 
-export function compileAssignmentExpression(exp: AssignmentExpression, env: Environment) {
+export function compileAssignmentExpression(
+    exp: AssignmentExpression,
+    env: Environment
+) {
     const assigne = compiler.compile(exp.assigne, false, env);
     const value = compiler.compile(exp.value, false, env);
 
     if (!env.doesExistWithType(assigne, 'Variable')) {
-        logError(`${assigne} is not defined!`);
+        logError(`Assigne ${assigne} is not defined!`);
         Deno.exit(1);
     }
 

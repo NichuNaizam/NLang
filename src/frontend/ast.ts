@@ -1,3 +1,5 @@
+import { FunctionData, VariableData } from "../utils/types.ts";
+
 export type NodeType =
     // Statements
     | 'Program'
@@ -8,6 +10,8 @@ export type NodeType =
     | 'UnsafeStatement'
     | 'StructDeclaration'
     | 'ImportStatement'
+    | 'ClassDeclaration'
+    | 'NewStatement'
 
     // Expressions
     | 'AssignmentExpression'
@@ -46,6 +50,7 @@ export interface VariableDeclaration extends Statement {
     kind: 'VariableDeclaration';
     identifier: string;
     type: string;
+    macro: boolean;
     value?: Expression;
 }
 
@@ -81,6 +86,21 @@ export interface StructDeclaration extends Statement {
 export interface ImportStatement extends Statement {
     kind: 'ImportStatement';
     path: string;
+}
+
+export interface ClassDeclaration extends Statement {
+    kind: 'ClassDeclaration';
+    name: string;
+    variables: Map<string, VariableData>;
+    functions: Map<string, FunctionData>;
+    constructors: Map<string, FunctionData>;
+}
+
+export interface NewStatement extends Statement {
+    kind: 'NewStatement';
+    name: string;
+    args: Expression[];
+    macro: boolean;
 }
 
 // Expressions

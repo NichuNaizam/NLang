@@ -1,0 +1,13 @@
+{
+  "name": "nlang",
+  "version": "1.0.0",
+  "description": "A compiled programming language",
+  "main": "index.js",
+  "scripts": {
+    "test": "deno run -A src/main.ts script.n app",
+    "compile": "deno compile -A --output nlangc src/main.ts -- --is_compiled_binary",
+    "addToPath": "cp ./nlangc ~/bin/nlangc"
+  },
+  "author": "Naizam Ali Najad",
+  "license": "MIT"
+}

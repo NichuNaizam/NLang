@@ -1,7 +1,9 @@
 import {
+    ClassDeclaration,
     CppStatement,
     FunctionDeclaration,
     ImportStatement,
+    NewStatement,
     Program,
     ReturnStatement,
     StructDeclaration,
@@ -29,19 +31,24 @@ export function compileVariableDeclaration(
     varDecl: VariableDeclaration,
     env: Environment
 ) {
-    let code = (validateType(varDecl.type, env) as string) + ' ';
+    let code = validateType(varDecl.type, env, !varDecl.macro) + ' ';
+    let value = varDecl.value
+        ? `=${compiler.compile(varDecl.value, false, env)};`
+        : ';';
 
     if (varDecl.value) {
-        code += `${varDecl.identifier} = ${compiler.compile(
-            varDecl.value,
-            false,
-            env
-        )}`;
+        code += `${varDecl.identifier}${value}`;
     } else {
         code += `${varDecl.identifier}`;
     }
 
-    env.defineIdentifier(varDecl.identifier, 'Struct');
+    env.defineVariable(
+        varDecl.identifier,
+        varDecl.type,
+        value == ';' ? undefined : value,
+        false,
+        varDecl.macro
+    );
     return code;
 }
 
@@ -55,10 +62,10 @@ export function compileFunctionDeclaration(
     code += `${funcDecl.name}(`;
 
     for (let i = 0; i < funcDecl.parameters.length; i++) {
-        code +=
-            (validateType(funcDecl.parameters[i].type, env) as string) + ' ';
-        code += `${funcDecl.parameters[i].name}`;
-        newEnv.defineIdentifier(funcDecl.parameters[i].name, 'Struct');
+        let type = validateType(funcDecl.parameters[i].type, env);
+
+        code += `${type} ${funcDecl.parameters[i].name}`;
+        newEnv.defineVariable(funcDecl.parameters[i].name, type);
 
         if (i < funcDecl.parameters.length - 1) {
             code += ', ';
@@ -73,7 +80,12 @@ export function compileFunctionDeclaration(
 
     code += '}';
 
-    env.defineFunction(funcDecl.name, funcDecl.parameters, funcDecl.returnType);
+    env.defineFunction(
+        funcDecl.name,
+        funcDecl.body,
+        funcDecl.parameters,
+        funcDecl.returnType
+    );
     return code;
 }
 
@@ -125,11 +137,19 @@ export function compileStructDeclaration(
 
     code += '};';
 
-    env.defineStruct(structDecl.name, properties);
+    env.defineStruct(structDecl.name, {
+        valueType: 'Struct',
+        name: structDecl.name,
+        types: properties,
+        values: new Environment(),
+    });
     return code;
 }
 
-export function compileImportStatement(importStmt: ImportStatement, env: Environment) {
+export function compileImportStatement(
+    importStmt: ImportStatement,
+    env: Environment
+) {
     let code = '';
 
     try {
@@ -139,10 +159,130 @@ export function compileImportStatement(importStmt: ImportStatement, env: Environ
         const program = parser.produceAST(importCode);
 
         code = compiler.compile(program, true, env, true);
-    } catch(e) {
+    } catch (e) {
         logError(`Failed to import file ${importStmt.path}`);
         Deno.exit(1);
     }
 
     return code;
+}
+
+export function compileClassDeclaration(
+    classDecl: ClassDeclaration,
+    env: Environment
+) {
+    let code = `class ${classDecl.name}{`;
+
+    const classEnv = new Environment();
+    for (const [name, data] of classDecl.constructors) {
+        if (data.returnType != 'Void') {
+            logError(`Constructor ${name} cannot have a return type`);
+            Deno.exit(1);
+        }
+
+        classEnv.defineFunction(
+            classDecl.name,
+            data.body,
+            data.parameters,
+            data.returnType,
+            data.visibility == 'private'
+        );
+    }
+
+    for (const [name, data] of classDecl.functions) {
+        classEnv.defineFunction(
+            name,
+            data.body,
+            data.parameters,
+            data.returnType,
+            data.visibility == 'private'
+        );
+    }
+
+    for (const [name, data] of classDecl.variables) {
+        classEnv.defineVariable(
+            name,
+            data.type,
+            data.value ? compiler.compile(data.value, false, env) : undefined,
+            data.visibility == 'private'
+        );
+    }
+
+    code += 'public:';
+    for (const v of classEnv.getAllPublicVariables()) {
+        code += `${v.type} ${v.name}${v.value ? `=${v.value};` : ';'}`;
+    }
+    for (const f of classEnv.getAllPublicFunctions()) {
+        const funcEnv = new Environment(classEnv);
+
+        code += f.name == classDecl.name ? `${f.name}(` : `${f.returnType} ${f.name}(`;
+        for (let i = 0; i < f.parameters.length; i++) {
+            funcEnv.defineVariable(f.parameters[i].name, f.parameters[i].type);
+            code += `${f.parameters[i].type} ${f.parameters[i].name}`;
+            if (i < f.parameters.length - 1) {
+                code += ', ';
+            }
+        }
+
+        code += '){';
+        for (const stmt of f.body) {
+            code += compiler.compile(stmt, true, funcEnv);
+        }
+        code += '}';
+    }
+
+    code += 'private:';
+    for (const v of classEnv.getAllPrivateVariables()) {
+        code += `${v.type} ${v.name}${v.value ? `=${v.value};` : ';'}`;
+    }
+    for (const f of classEnv.getAllPrivateFunctions()) {
+        const funcEnv = new Environment(classEnv);
+
+        code +=
+            f.name == classDecl.name
+                ? `${f.name}(`
+                : `${f.returnType} ${f.name}(`;
+        for (let i = 0; i < f.parameters.length; i++) {
+            funcEnv.defineVariable(f.parameters[i].name, f.parameters[i].type);
+
+            code += `${f.parameters[i].type} ${f.parameters[i].name}`;
+            if (i < f.parameters.length - 1) {
+                code += ', ';
+            }
+        }
+        code += '){';
+        for (const stmt of f.body) {
+            code += compiler.compile(stmt, true, funcEnv);
+        }
+        code += '}';
+    }
+
+    env.defineClass(classDecl.name, {
+        valueType: 'Class',
+        name: classDecl.name,
+        env: classEnv,
+    });
+    return (code += '};');
+}
+
+export function compileNewStatement(
+    newStmt: NewStatement,
+    env: Environment
+) {
+    if (!newStmt.macro && !env.doesExistWithType(newStmt.name, 'Class')) {
+        logError(`Class ${newStmt.name} does not exist`);
+        Deno.exit(1);
+    }
+
+    let code = `${newStmt.name}(`;
+
+    for (let i = 0; i < newStmt.args.length; i++) {
+        code += compiler.compile(newStmt.args[i], false, env);
+
+        if (i < newStmt.args.length - 1) {
+            code += ', ';
+        }
+    }
+
+    return (code += ')');
 }

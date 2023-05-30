@@ -4,33 +4,65 @@ import Parser from './frontend/parser.ts';
 import downloadFile from './utils/downloadFile.ts';
 import { logInfo, logWarn } from './utils/logger.ts';
 import { Config } from './utils/types.ts';
+import { parseArgs } from './utils/utils.ts';
+
+// constants
+const IS_COMPILED = Deno.args.includes('--is_compiled_binary');
+const VERSION = '0.0.1';
+
+const path = Deno.execPath().split('/');
+path.pop();
+
+const PATH_TO_EXEC = IS_COMPILED ? path.join('/') : '.';
 
 // Parse command line arguments
-const args = Deno.args;
-if (args.length != 2) {
-    console.log('Usage: nlangc <source file> <output file>');
+const parsedArgs = parseArgs(Deno.args);
+
+if (parsedArgs.get('h') || parsedArgs.get('help')) {
+    console.log(`NLang Compiler v${VERSION}
+Usage: nlangc <source file> -o <output file>
+Options:
+    -h, --help      Show this help message
+    -o, --output    Output file name
+    -i, --init      Create a nlang.json file
+`);
+    Deno.exit(0);
+}
+
+const sourceFile = parsedArgs.get('sourceFile');
+const output = parsedArgs.get('o') || parsedArgs.get('output');
+
+if (!sourceFile) {
+    console.log('No source file specified!');
     Deno.exit(1);
 }
 
-const sourceFile = args[0];
-const output = args[1];
-
-if (sourceFile == '') {
-    console.error('No source file specified');
-    Deno.exit(1);
-}
-
-if (output == '') {
-    console.error('No output file specified');
+if (!output) {
+    console.log('No output file specified!');
     Deno.exit(1);
 }
 
 let config = {
-    outDir: 'out',
-    outFile: 'nlang.cpp',
+    outDir: '.nlang',
+    purgeOutDir: true,
+    cppFile: 'nlang.cpp',
     compileCommand: 'g++',
-    compileArgs: ['-std=c++17'],
+    compileArgs: [
+        '${outDir}/${cppFile}',
+        '-std=c++17',
+        '-I',
+        '${nlangDir}',
+        '-o',
+        '${outBinary}',
+    ],
 } as Config;
+
+// Check if the bin folder exists
+try {
+    await Deno.stat(`${PATH_TO_EXEC}/bin`);
+} catch (e) {
+    await Deno.mkdir(`${PATH_TO_EXEC}/bin`);
+}
 
 // Check config file
 try {
@@ -43,14 +75,26 @@ try {
         ...config,
         ...loadedConfig,
     };
-} catch(e) {
-    const data = JSON.stringify(config, null, 4);
-    Deno.writeFileSync('./nlang.json', new TextEncoder().encode(data));
+} catch (e) {
+    if (parsedArgs.get('init') || parsedArgs.get('i')) {
+        Deno.writeTextFileSync('./nlang.json', JSON.stringify(config, null, 4));
+        Deno.exit(0);
+    }
 }
 
+config.compileArgs = config.compileArgs.map((arg: string) => {
+    arg = arg.replace('${nlangDir}', `${PATH_TO_EXEC}/bin`);
+    arg = arg.replace('${cppFile}', config.cppFile);
+    arg = arg.replace('${outBinary}', output);
+    arg = arg.replace('${outDir}', config.outDir);
+    return arg;
+});
+
 // Read the source file
+logInfo(`Reading ${sourceFile}`);
 const source = Deno.readTextFileSync(sourceFile);
 
+logInfo('Parsing source code...');
 const parser = new Parser();
 const ast = parser.produceAST(source);
 
@@ -66,22 +110,28 @@ try {
     // Ignore
 }
 
-Deno.writeFileSync(`${config.outDir}/${config.outFile}`, new TextEncoder().encode(code));
+Deno.writeFileSync(
+    `${config.outDir}/${config.cppFile}`,
+    new TextEncoder().encode(code)
+);
 
 // Check if nlang.h exists file
 try {
-    await Deno.stat(`${config.outDir}/nlang.h`);
+    await Deno.stat(`${PATH_TO_EXEC}/bin/nlang.h`);
 } catch (e) {
     // Download nlang.h
     logWarn('nlang.h not found, downloading...');
     const time = Date.now();
-    await downloadFile('https://raw.githubusercontent.com/NichuNaizam/NLang/master/nlang.h', `${config.outDir}/nlang.h`);
+    await downloadFile(
+        'https://raw.githubusercontent.com/NichuNaizam/NLang/master/nlang.h',
+        `${PATH_TO_EXEC}/bin/nlang.h`
+    );
     logInfo(`Downloaded nlang.h in ${Date.now() - time}ms!`);
 }
 
 // Compile the code
 const command = new Deno.Command(config.compileCommand, {
-    args: [`${config.outDir}/${config.outFile}`, '-o', output, ...config.compileArgs],
+    args: config.compileArgs,
 });
 const process = command.spawn();
 await process.output();
